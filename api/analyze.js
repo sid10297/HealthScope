@@ -1,8 +1,8 @@
 const fetch = require("node-fetch");
 
 function extractJSON(text) {
-    const match = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/); // Match first JSON object or array
-    return match ? match[0] : null;
+  const match = text.match(/(```json)?[\s]*([\[{][\s\S]*[\]}])[\s]*(```)?/);
+  return match ? match[2].trim() : null;
 }
 
 module.exports = async (req, res) => {
@@ -13,7 +13,7 @@ module.exports = async (req, res) => {
   const { chunk } = req.body;
 
   if (!chunk) {
-    return res.status(400).json({ message: "Missing chunk" });
+    return res.status(400).json({ message: "Missing chunk in request body" });
   }
 
   const messages = [
@@ -23,7 +23,7 @@ module.exports = async (req, res) => {
     },
     {
       role: "user",
-      content: `Analyze this report:\n\n${chunk}\n\nReturn only:\n[{"test":"..."}]`,
+      content: `Analyze this report:\n\n${chunk}\n\nReturn only JSON like this:\n[\n  {\n    "test": "...",\n    "value": "...",\n    "unit": "...",\n    "normal_range": "...",\n    "status": "...",\n    "explanation": "...",\n    "urgency": "...",\n    "severity": "...",\n    "trend": "..." \n  }\n]`,
     },
   ];
 
@@ -32,7 +32,7 @@ module.exports = async (req, res) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, // ⛳️ Make sure this is set in your Vercel env vars
       },
       body: JSON.stringify({
         model: "openai/gpt-3.5-turbo",
@@ -43,17 +43,46 @@ module.exports = async (req, res) => {
     });
 
     const result = await aiResponse.json();
-    const raw = result.choices?.[0]?.message?.content;
+    const rawContent = result.choices?.[0]?.message?.content;
 
-    if (!raw) {
-      return res.status(500).json({ message: "No response from AI", openrouter_raw: result });
+    if (!rawContent) {
+      return res.status(500).json({
+        message: "No content from AI response",
+        openrouter_raw: result,
+      });
     }
 
-    const clean = extractJSON(raw);
-    const parsed = JSON.parse(clean);
+    const clean = extractJSON(rawContent);
+
+    if (!clean) {
+      return res.status(500).json({
+        message: "No valid JSON structure found in AI response",
+        rawContent,
+      });
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(clean);
+
+      // Ensure it’s an array of objects
+      if (!Array.isArray(parsed)) {
+        throw new Error("Parsed data is not an array");
+      }
+    } catch (err) {
+      return res.status(500).json({
+        message: "Failed to parse extracted JSON",
+        error: err.message,
+        raw: clean,
+      });
+    }
 
     return res.status(200).json(parsed);
   } catch (err) {
-    return res.status(500).json({ message: "OpenRouter error", error: err.message });
+    console.error("OpenRouter Error:", err);
+    return res.status(500).json({
+      message: "OpenRouter error",
+      error: err.message,
+    });
   }
 };
