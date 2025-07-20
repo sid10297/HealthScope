@@ -2356,44 +2356,52 @@
             }
 
             async function analyzeMedicalReport(extractedText, fileName) {
-                const chunks = splitIntoChunks(extractedText, 300); // split large report
+                const chunks = splitIntoChunks(extractedText, 300);
                 let allResults = [];
 
-                // 1️⃣ Analyze each chunk using your backend API
-                for (const chunk of chunks) {
+                // 1️⃣ Analyze each chunk in parallel
+                const analysisPromises = chunks.map(async (chunk) => {
                     try {
                         const res = await fetch('/api/analyze', {
                             method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({chunk, fileName})
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ chunk, fileName })
                         });
 
                         if (!res.ok) {
                             const errText = await res.text();
                             console.warn("❌ Failed to analyze chunk:", errText);
-                            continue;
+                            return [];
                         }
 
                         const parsed = await res.json();
 
                         if (Array.isArray(parsed)) {
-                            allResults.push(...parsed);
+                            return parsed;
                         } else {
                             console.warn("Unexpected response format from /api/analyze:", parsed);
+                            return [];
                         }
                     } catch (err) {
                         console.error("Error analyzing chunk:", err);
+                        return [];
                     }
-                }
+                });
 
-                // 2️⃣ Request summary from your backend
+                // Wait for all chunks to be processed
+                const analysisResults = await Promise.all(analysisPromises);
+                analysisResults.forEach(result => {
+                    allResults.push(...result);
+                });
+
+                // 2️⃣ Request summary
                 let recommendations = [], urgent_flags = [], overall_status = "Normal";
 
                 try {
                     const summaryRes = await fetch('/api/summarize', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({allResults})
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ allResults })
                     });
 
                     if (!summaryRes.ok) {
@@ -2409,7 +2417,7 @@
                     console.error("Error getting summary:", err);
                 }
 
-                // ✅ Final response object
+                // ✅ Final response
                 return {
                     report_type: "Auto-analyzed Report",
                     file_name: fileName,
@@ -2420,6 +2428,7 @@
                     urgent_flags
                 };
             }
+
 
             function generateEnhancedAnalysis(text, fileName) {
                 // Enhanced pattern matching with better medical term recognition

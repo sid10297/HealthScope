@@ -1,5 +1,10 @@
 const fetch = require("node-fetch");
 
+function extractJSON(text) {
+    const match = text.match(/\{[\s\S]*\}|\[[\s\S]*\]/); // Match first JSON object or array
+    return match ? match[0] : null;
+}
+
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method Not Allowed" });
@@ -44,7 +49,7 @@ module.exports = async (req, res) => {
       return res.status(500).json({ message: "No response from AI", openrouter_raw: result });
     }
 
-    const clean = raw.replace(/^```json|^```|```$/g, "").trim();
+    const clean = extractJSON(raw);
     const parsed = JSON.parse(clean);
 
     return res.status(200).json(parsed);
