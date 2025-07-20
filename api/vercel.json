@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/analyze",
+      "methods": ["POST"],
+      "dest": "/api/analyze.js"
+    },
+    {
+      "src": "/api/summarize",
+      "methods": ["POST"],
+      "dest": "/api/summarize.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    }
+  ]
+}

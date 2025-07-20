@@ -2356,46 +2356,60 @@
             }
 
             async function analyzeMedicalReport(extractedText, fileName) {
-                const chunks = splitIntoChunks(extractedText, 300);
+                const chunks = splitIntoChunks(extractedText, 300); // split large report
                 let allResults = [];
 
-                // 1️⃣ Analyze each chunk using your backend
+                // 1️⃣ Analyze each chunk using your backend API
                 for (const chunk of chunks) {
-                    const response = await fetch('/api/analyze', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ chunk, fileName })
-                    });
+                    try {
+                        const res = await fetch('/api/analyze', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({chunk, fileName})
+                        });
 
-                    if (!response.ok) {
-                        console.warn("Failed to analyze chunk:", await response.text());
-                        continue;
-                    }
+                        if (!res.ok) {
+                            const errText = await res.text();
+                            console.warn("❌ Failed to analyze chunk:", errText);
+                            continue;
+                        }
 
-                    const parsed = await response.json();
-                    if (Array.isArray(parsed)) {
-                        allResults.push(...parsed);
+                        const parsed = await res.json();
+
+                        if (Array.isArray(parsed)) {
+                            allResults.push(...parsed);
+                        } else {
+                            console.warn("Unexpected response format from /api/analyze:", parsed);
+                        }
+                    } catch (err) {
+                        console.error("Error analyzing chunk:", err);
                     }
                 }
 
-                // 2️⃣ Request summary (recommendations + urgent flags)
+                // 2️⃣ Request summary from your backend
                 let recommendations = [], urgent_flags = [], overall_status = "Normal";
 
                 try {
                     const summaryRes = await fetch('/api/summarize', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ allResults })
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({allResults})
                     });
 
-                    const summary = await summaryRes.json();
-                    recommendations = summary.recommendations || [];
-                    urgent_flags = summary.urgent_flags || [];
-                    overall_status = summary.overall_status || "Review Needed";
-                } catch (e) {
-                    console.warn("Summary error:", e);
+                    if (!summaryRes.ok) {
+                        const errorText = await summaryRes.text();
+                        console.warn("❌ Summary API failed:", errorText);
+                    } else {
+                        const summary = await summaryRes.json();
+                        recommendations = summary.recommendations || [];
+                        urgent_flags = summary.urgent_flags || [];
+                        overall_status = summary.overall_status || "Review Needed";
+                    }
+                } catch (err) {
+                    console.error("Error getting summary:", err);
                 }
 
+                // ✅ Final response object
                 return {
                     report_type: "Auto-analyzed Report",
                     file_name: fileName,
@@ -2406,11 +2420,6 @@
                     urgent_flags
                 };
             }
-
-
-
-
-
 
             function generateEnhancedAnalysis(text, fileName) {
                 // Enhanced pattern matching with better medical term recognition
