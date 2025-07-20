@@ -1,7 +1,13 @@
 export default async function handler(req, res) {
-    if (req.method !== 'POST') return res.status(405).end("Method Not Allowed");
+    if (req.method !== 'POST') {
+        return res.status(405).json({ message: 'Method Not Allowed' });
+    }
 
     const { allResults } = req.body;
+
+    if (!allResults || !Array.isArray(allResults)) {
+        return res.status(400).json({ message: 'Missing or invalid allResults array' });
+    }
 
     const messages = [
         {
@@ -10,7 +16,7 @@ export default async function handler(req, res) {
         },
         {
             role: "user",
-            content: `From these test results, give:\n\n1. recommendations\n2. urgent_flags (test names)\n3. overall_status\n\n${JSON.stringify(allResults)}\n\nRespond with:\n{\n  "recommendations": ["..."],\n  "urgent_flags": ["..."],\n  "overall_status": "..." \n}`
+            content: `From these test results, give:\n\n1. recommendations\n2. urgent_flags (test names)\n3. overall_status\n\n${JSON.stringify(allResults)}\n\nRespond with JSON like:\n{\n  "recommendations": ["..."],\n  "urgent_flags": ["..."],\n  "overall_status": "..." \n}`
         }
     ];
 
@@ -20,7 +26,7 @@ export default async function handler(req, res) {
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                'HTTP-Referer': 'https://your-vercel-project.vercel.app'
+                'HTTP-Referer': 'https://health-scope.vercel.app'
             },
             body: JSON.stringify({
                 model: "openai/gpt-3.5-turbo",
@@ -31,11 +37,25 @@ export default async function handler(req, res) {
         });
 
         const result = await response.json();
-        const content = result.choices?.[0]?.message?.content?.replace(/^```json|^```|```$/g, '').trim();
-        const parsed = JSON.parse(content);
+
+        const rawContent = result.choices?.[0]?.message?.content;
+
+        if (!rawContent) {
+            return res.status(500).json({ message: "No response from OpenRouter." });
+        }
+
+        const cleanContent = rawContent.replace(/^```json|^```|```$/g, '').trim();
+
+        let parsed;
+        try {
+            parsed = JSON.parse(cleanContent);
+        } catch (err) {
+            return res.status(500).json({ message: "Failed to parse summary JSON", error: cleanContent });
+        }
+
         return res.status(200).json(parsed);
     } catch (err) {
-        console.error(err);
+        console.error("Summary error:", err);
         return res.status(500).json({ message: "Summary error", error: err.message });
     }
 }

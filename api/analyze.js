@@ -1,7 +1,13 @@
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end("Method Not Allowed");
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Method Not Allowed' });
+  }
 
   const { chunk, fileName } = req.body;
+
+  if (!chunk) {
+    return res.status(400).json({ message: 'Missing chunk' });
+  }
 
   const messages = [
     {
@@ -20,7 +26,7 @@ export default async function handler(req, res) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'HTTP-Referer': 'https://your-vercel-project.vercel.app'
+        'HTTP-Referer': 'https://health-scope.vercel.app'
       },
       body: JSON.stringify({
         model: "openai/gpt-3.5-turbo",
@@ -31,12 +37,24 @@ export default async function handler(req, res) {
     });
 
     const result = await aiResponse.json();
-    const content = result.choices?.[0]?.message?.content?.replace(/^```json|^```|```$/g, '').trim();
-    const parsed = JSON.parse(content);
+
+    const raw = result.choices?.[0]?.message?.content;
+    if (!raw) {
+      return res.status(500).json({ message: "No content returned from OpenRouter." });
+    }
+
+    const clean = raw.replace(/^```json|^```|```$/g, '').trim();
+
+    let parsed;
+    try {
+      parsed = JSON.parse(clean);
+    } catch (err) {
+      return res.status(500).json({ message: "Failed to parse AI response", error: clean });
+    }
 
     return res.status(200).json(parsed);
   } catch (error) {
-    console.error(error);
+    console.error("OpenAI API error:", error);
     return res.status(500).json({ message: "OpenAI error", error: error.message });
   }
 }
