@@ -2359,106 +2359,43 @@
                 const chunks = splitIntoChunks(extractedText, 300);
                 let allResults = [];
 
-                // Analyze each chunk and collect test results
+                // 1️⃣ Analyze each chunk using your backend
                 for (const chunk of chunks) {
-                    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    const response = await fetch('/api/analyze', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer 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`,
-                            'HTTP-Referer': 'https://96798f1e-2e45-4e2b-a038-69eb3a976e1d-00-3npa5curxj6av.pike.replit.dev',
-                            'X-Title': 'HealthReportAnalyzer'
-                        },
-                        body: JSON.stringify({
-                            model: "openai/gpt-3.5-turbo",
-                            messages: getPromptMessages(chunk, fileName),
-                            max_tokens: 1500,
-                            temperature: 0.2,
-                        })
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ chunk, fileName })
                     });
 
                     if (!response.ok) {
-                        const errorText = await response.text();
-                        console.warn("Failed to analyze chunk:", errorText);
+                        console.warn("Failed to analyze chunk:", await response.text());
                         continue;
                     }
 
-                    const data = await response.json();
-                    const rawContent = data.choices?.[0]?.message?.content?.trim();
-
-                    try {
-                        const cleanContent = rawContent.replace(/^```json|^```|```$/g, '').trim();
-                        const parsed = JSON.parse(cleanContent);
-
-                        if (Array.isArray(parsed)) {
-                            allResults.push(...parsed);
-                        } else {
-                            console.warn("Unexpected parsed result:", parsed);
-                        }
-                    } catch (err) {
-                        console.error("Failed to parse JSON:", err);
+                    const parsed = await response.json();
+                    if (Array.isArray(parsed)) {
+                        allResults.push(...parsed);
                     }
                 }
 
-                // SECONDARY AI CALL: Generate recommendations & urgent flags from all results
+                // 2️⃣ Request summary (recommendations + urgent flags)
                 let recommendations = [], urgent_flags = [], overall_status = "Normal";
 
                 try {
-                    const summaryRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                    const summaryRes = await fetch('/api/summarize', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer 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`,
-                            'HTTP-Referer': 'https://96798f1e-2e45-4e2b-a038-69eb3a976e1d-00-3npa5curxj6av.pike.replit.dev'
-                        },
-                        body: JSON.stringify({
-                            model: "openai/gpt-3.5-turbo",
-                            messages: [
-                                {
-                                    role: "system",
-                                    content: "You are a clinical assistant summarizing medical test results."
-                                },
-                                {
-                                    role: "user",
-                                    content: `From the following lab results, extract:\n
-            1. A list of patient-friendly health recommendations\n
-            2. Urgent flags (test names) for anything abnormal/critical\n
-            3. An overall health status: "Normal", "Needs Attention", or "Critical"\n
-            \nResults:\n${JSON.stringify(allResults)}\n
-            Respond as:\n{
-              "recommendations": ["..."],
-              "urgent_flags": ["..."],
-              "overall_status": "..."
-            }`
-                                }
-                            ],
-                            max_tokens: 800,
-                            temperature: 0.2
-                        })
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ allResults })
                     });
 
-                    const summaryData = await summaryRes.json();
-                    const cleanText = summaryData.choices?.[0]?.message?.content?.replace(/^```json|^```|```$/g, '').trim();
-                    const summaryParsed = JSON.parse(cleanText);
-
-                    recommendations = summaryParsed.recommendations || [];
-                    urgent_flags = summaryParsed.urgent_flags || [];
-                    overall_status = summaryParsed.overall_status || "Review Needed";
-                } catch (error) {
-                    console.warn("Failed to generate summary:", error);
+                    const summary = await summaryRes.json();
+                    recommendations = summary.recommendations || [];
+                    urgent_flags = summary.urgent_flags || [];
+                    overall_status = summary.overall_status || "Review Needed";
+                } catch (e) {
+                    console.warn("Summary error:", e);
                 }
 
-                console.log({
-                    report_type: "Auto-analyzed Report",
-                    file_name: fileName,
-                    date_analyzed: new Date().toISOString().split('T')[0],
-                    overall_status,
-                    results: allResults,
-                    recommendations,
-                    urgent_flags
-                })
-
-                // ✅ FINAL STRUCTURED RESPONSE
                 return {
                     report_type: "Auto-analyzed Report",
                     file_name: fileName,
@@ -2469,6 +2406,7 @@
                     urgent_flags
                 };
             }
+
 
 
 
