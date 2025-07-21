@@ -16,15 +16,26 @@ module.exports = async (req, res) => {
   const messages = [
     {
       role: "system",
-      content: "You are a clinical assistant summarizing lab test results.",
+      content: `You are a medical assistant summarizing lab test results into actionable insights. 
+  Return a clean JSON object with the following keys only:
+  - recommendations (array of 1-line advice)
+  - urgent_flags (array of test names that require urgent attention)
+  - overall_status (one-line summary of the report condition)
+
+  Respond only with a JSON object.`,
     },
     {
       role: "user",
-      content: `From these test results, give:\n\n1. recommendations\n2. urgent_flags (test names)\n3. overall_status\n\n${JSON.stringify(
+      content: `Based on the following extracted test results:\n\n${JSON.stringify(
         allResults
-      )}\n\nRespond with JSON like:\n{\n  "recommendations": ["..."],\n  "urgent_flags": ["..."],\n  "overall_status": "..." \n}`,
+      )}\n\nReturn a JSON response like:\n{
+    "recommendations": ["..."],
+    "urgent_flags": ["..."],
+    "overall_status": "..."
+  }`,
     },
   ];
+
 
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {

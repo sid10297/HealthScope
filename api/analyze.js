@@ -19,11 +19,26 @@ module.exports = async (req, res) => {
   const messages = [
     {
       role: "system",
-      content: `You are a medical report analyzer. Extract key lab values and return a clean JSON array.`,
+      content: `You are a medical report analyzer. Extract key test results from the input and return a structured JSON array.
+
+  Each item should have:
+  - test
+  - value
+  - unit
+  - normal_range
+  - status
+  - explanation
+  - urgency (Low, Moderate, High)
+  - severity (None, Mild, Moderate, Severe)
+  - confidence (High, Medium, Low)
+
+  The confidence level reflects how certain you are about the correctness of the interpretation based on clarity and standardization of the input.
+
+  Avoid medical disclaimers. Respond ONLY with a JSON array.`,
     },
     {
       role: "user",
-      content: `Analyze this report:\n\n${chunk}\n\nReturn only JSON like this:\n[\n  {\n    "test": "...",\n    "value": "...",\n    "unit": "...",\n    "normal_range": "...",\n    "status": "...",\n    "explanation": "...",\n    "urgency": "...",\n    "severity": "...",\n    "trend": "..." \n  }\n]`,
+      content: `Analyze this report:\n\n${chunk}`,
     },
   ];
 

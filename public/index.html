@@ -2820,17 +2820,16 @@
                                         <span class="text-sm text-gray-600">Normal Range:</span>
                                         <span class="text-sm font-medium text-gray-900 ml-2">${result.normal_range}</span>
                                     </div>
-                                    <div>
-                                        <span class="text-sm text-gray-600">Trend:</span>
-                                        <span class="text-sm font-medium ml-2 ${result.trend === 'improving' ? 'text-green-600' :
-                        result.trend === 'worsening' ? 'text-red-600' :
-                            'text-gray-600'
-                    }">
-                                            ${result.trend === 'improving' ? '↗️ Improving' :
-                        result.trend === 'worsening' ? '↘️ Worsening' :
-                            '➡️ Stable'}
-                                        </span>
-                                    </div>
+<div>
+    <span class="text-sm text-gray-600">Confidence:</span>
+    <span class="text-sm font-medium ml-2 ${
+        result.confidence === 'High' ? 'text-green-600' :
+        result.confidence === 'Medium' ? 'text-yellow-600' :
+        result.confidence === 'Low' ? 'text-red-600' : 'text-gray-600'
+    }">
+        ${result.confidence || 'Unknown'}
+    </span>
+</div>
                                 </div>
                                 <p class="text-sm text-gray-700">${result.explanation}</p>
                             </div>
